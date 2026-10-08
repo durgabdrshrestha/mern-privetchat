@@ -9,6 +9,10 @@ const getAllowedOrigins = () => {
     .map((origin) => origin.trim())
     .filter(Boolean)
 
+  if (process.env.NODE_ENV === 'production') {
+    return [...new Set(configuredOrigins)]
+  }
+
   return [...new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredOrigins])]
 }
 

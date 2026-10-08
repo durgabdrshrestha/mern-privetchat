@@ -3,7 +3,8 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { MessageSquareText, UserRound, Settings, Phone, Video, Bell, LogOut, Check, MoreVertical, Users, CircleDot, Wrench, PhoneOff } from 'lucide-react'
 import { getCurrentUser, getCurrentUserId, logout } from '../../services/api'
 import { getSocket, disconnectSocket } from '../../services/socket'
-import { startCallRingtone, stopCallRingtone, unlockCallAudio } from '../../services/callRingtone'
+import { playMessageNotification, startCallRingtone, stopCallRingtone, unlockCallAudio } from '../../services/callRingtone'
+import BrandLogo from '../brand/BrandLogo'
 
 const navItems = [
   { to: '/chats', label: 'Chats', icon: MessageSquareText },
@@ -71,6 +72,7 @@ export default function AppShell({ children }) {
     const handleIncomingMessage = (message) => {
       if (message.senderId?._id === getCurrentUserId()) return
       if (getCurrentUser()?.preferences?.notifications?.messages === false) return
+      playMessageNotification()
       const notification = {
         id: message._id,
         label: `${message.senderId?.name || 'A contact'} sent a message`,
@@ -156,7 +158,10 @@ export default function AppShell({ children }) {
       <div className="mx-auto flex h-full min-h-0 max-w-7xl flex-col lg:flex-row">
         <header className="z-30 shrink-0 border-b border-emerald-100 bg-white shadow-sm lg:hidden">
           <div className="flex h-14 items-center justify-between px-4">
-            <h1 className="text-lg font-bold text-emerald-800">Privet Chat</h1>
+            <div className="flex items-center gap-2.5">
+              <BrandLogo className="h-9 w-9" />
+              <h1 className="text-lg font-bold text-emerald-800">Privet Chat</h1>
+            </div>
             <div className="flex items-center gap-1 text-slate-600">
               <button onClick={() => navigate('/calls')} className="rounded-full p-2.5 hover:bg-emerald-50" aria-label="Start a video call"><Video size={20} /></button>
               <button onClick={() => setShowAppMenu((current) => !current)} className="rounded-full p-2.5 hover:bg-slate-100" aria-label="Open app menu" aria-expanded={showAppMenu}><MoreVertical size={20} /></button>
@@ -168,14 +173,19 @@ export default function AppShell({ children }) {
               <button onClick={() => { setShowAppMenu(false); navigate('/chats') }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"><MessageSquareText size={17} /> Chat list</button>
               <button onClick={() => { setShowAppMenu(false); navigate('/profile') }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"><UserRound size={17} /> Profile</button>
               <button onClick={() => { setShowAppMenu(false); navigate('/settings') }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"><Settings size={17} /> Settings</button>
+              <div className="my-1 border-t border-slate-100" />
+              <button onClick={() => { setShowAppMenu(false); handleLogout() }} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-red-700 hover:bg-red-50"><LogOut size={17} /> Log out</button>
             </div>
           )}
         </header>
         <aside className="hidden border-b border-emerald-100 bg-[#f4faf7] shadow-sm shadow-emerald-100/60 lg:block lg:min-h-screen lg:w-80 lg:border-b-0 lg:border-r">
           <div className="sticky top-0 z-20 flex items-center justify-between border-b border-emerald-100 bg-white/90 px-4 py-4 backdrop-blur-sm">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-600">Privet</p>
-              <h1 className="text-xl font-extrabold text-slate-800">Connect</h1>
+            <div className="flex items-center gap-3">
+              <BrandLogo className="h-11 w-11" />
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.24em] text-emerald-600">Privet</p>
+                <h1 className="text-xl font-extrabold text-slate-800">Connect</h1>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-slate-500">
               <button onClick={() => handleCallAction('audio')} className="rounded-xl p-2.5 transition hover:bg-emerald-50 hover:text-emerald-700" aria-label="Calls"><Phone size={18} /></button>

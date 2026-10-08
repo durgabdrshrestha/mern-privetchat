@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, ArrowRight } from 'lucide-react'
 import { apiFetch, setAuthToken, setCurrentUser } from '../../services/api'
 import { getSocket } from '../../services/socket'
+import BrandLogo from '../../components/brand/BrandLogo'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -43,12 +44,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 px-4 py-10 text-slate-800">
-      <div className="mx-auto max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/80">
+    <div className="flex min-h-dvh items-center justify-center overflow-y-auto bg-slate-100 px-4 py-8 text-slate-800">
+      <div className="mx-auto w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/80">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-lg font-bold text-white shadow-lg shadow-indigo-200">
-            P
-          </div>
+          <BrandLogo className="mx-auto mb-4 h-14 w-14" />
           <h1 className="text-3xl font-bold tracking-tight">Privet Connect</h1>
           <p className="mt-2 text-sm text-slate-500">Secure real-time communication</p>
         </div>

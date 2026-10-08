@@ -8,7 +8,7 @@
   "theme_color": "#0f9f6e",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/privet-logo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

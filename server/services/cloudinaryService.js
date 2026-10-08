@@ -49,6 +49,9 @@ const uploadToLocalStorage = async (file, fallbackBaseUrl) => {
 const uploadToCloudinary = async (file, fallbackBaseUrl) => {
   const client = getCloudinary()
   if (!client) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Cloudinary must be configured for production uploads')
+    }
     return uploadToLocalStorage(file, fallbackBaseUrl)
   }
 
@@ -76,6 +79,7 @@ const uploadToCloudinary = async (file, fallbackBaseUrl) => {
     })
     return { ...result, storage_provider: 'cloudinary' }
   } catch (error) {
+    if (process.env.NODE_ENV === 'production') throw error
     console.error('Cloudinary upload failed; using local storage:', error.message)
     return uploadToLocalStorage(file, fallbackBaseUrl)
   }

@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: privet-connect-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      # Enter the deployed frontend origin, for example https://chat.example.com
+      - key: CLIENT_URL
+        sync: false
+      # Enter the Render API origin, for example https://privet-connect-api.onrender.com
+      - key: SERVER_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Comma-separated TURN/TURNS URIs from a TURN provider that supports shared-secret credentials.
+      - key: TURN_URLS
+        sync: false
+      - key: TURN_SHARED_SECRET
+        sync: false
+
+  - type: web
+    name: privet-connect-web
+    runtime: static
+    rootDir: client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: commit
+    envVars:
+      # Set to the deployed backend URL with the /api suffix.
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

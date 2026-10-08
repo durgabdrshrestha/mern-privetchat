@@ -2,6 +2,7 @@ const express = require('express')
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const multer = require('multer')
+const { rateLimit } = require('express-rate-limit')
 const User = require('../models/User')
 const authMiddleware = require('../middleware/authMiddleware')
 const { getCloudinary, uploadToCloudinary, deleteFromCloudinary } = require('../services/cloudinaryService')
@@ -17,6 +18,13 @@ const profilePhotoUpload = multer({
     }
     callback(null, true)
   },
+})
+const authAttemptLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many sign-in attempts. Please try again later.' },
 })
 
 const createToken = (user) => jwt.sign(
@@ -165,7 +173,7 @@ router.patch('/password', authMiddleware, async (req, res) => {
   }
 })
 
-router.post('/register', async (req, res) => {
+router.post('/register', authAttemptLimit, async (req, res) => {
   const { name, username, email, password } = req.body
 
   if (!name || !username || !email || !password) {
@@ -226,7 +234,7 @@ router.post('/register', async (req, res) => {
   }
 })
 
-router.post('/login', async (req, res) => {
+router.post('/login', authAttemptLimit, async (req, res) => {
   const { email, password } = req.body
 
   if (!email || !password) {

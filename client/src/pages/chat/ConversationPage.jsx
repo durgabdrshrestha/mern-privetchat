@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Smile, Mic, Send, StopCircle, Trash2, Check, CheckCheck, PhoneOff, MicOff, VideoOff } from 'lucide-react'
+import { ArrowLeft, Phone, Video, MoreVertical, Paperclip, Smile, Mic, Send, StopCircle, Trash2, Check, CheckCheck, PhoneOff, MicOff, VideoOff, Volume2, VolumeX } from 'lucide-react'
 import { apiFetch, getCurrentUserId } from '../../services/api'
 import { getSocket } from '../../services/socket'
 import { startCallRingtone, stopCallRingtone } from '../../services/callRingtone'
@@ -43,6 +43,7 @@ export default function ConversationPage() {
   const [callDuration, setCallDuration] = useState(0)
   const [isMicMuted, setIsMicMuted] = useState(false)
   const [isCameraOff, setIsCameraOff] = useState(false)
+  const [speakerPlaybackBlocked, setSpeakerPlaybackBlocked] = useState(false)
 
   const typingTimeoutRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -52,6 +53,7 @@ export default function ConversationPage() {
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
   const remoteAudioRef = useRef(null)
+  const remoteStreamRef = useRef(null)
   const peerConnectionRef = useRef(null)
   const messageInputRef = useRef(null)
   const pendingIceCandidatesRef = useRef([])
@@ -429,6 +431,7 @@ export default function ConversationPage() {
 
   const attachRemoteMedia = (remoteStream) => {
     if (!remoteStream) return
+    remoteStreamRef.current = remoteStream
 
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = remoteStream
@@ -442,14 +445,32 @@ export default function ConversationPage() {
       remoteAudioRef.current.muted = false
       remoteAudioRef.current.volume = 1
       remoteAudioRef.current.autoplay = true
-      remoteAudioRef.current.play().catch(() => {
-        setTimeout(() => {
-          remoteAudioRef.current?.play().catch(() => {})
-        }, 250)
-      })
+      remoteAudioRef.current.play()
+        .then(() => setSpeakerPlaybackBlocked(false))
+        .catch((error) => {
+          console.warn('Remote audio playback needs user interaction:', error.name)
+          setSpeakerPlaybackBlocked(true)
+        })
     }
 
     setCallState((current) => ({ ...current, remoteStream }))
+  }
+
+  const enableRemoteAudio = async () => {
+    const audio = remoteAudioRef.current
+    const remoteStream = callStateRef.current?.remoteStream || remoteStreamRef.current
+    if (!audio || !remoteStream) return
+
+    audio.srcObject = remoteStream
+    audio.muted = false
+    audio.volume = 1
+    try {
+      await audio.play()
+      setSpeakerPlaybackBlocked(false)
+    } catch (error) {
+      console.error('Could not play remote call audio:', error)
+      setSpeakerPlaybackBlocked(true)
+    }
   }
 
   const setupCallPeer = async (remoteUserId, type) => {
@@ -479,7 +500,15 @@ export default function ConversationPage() {
     })
 
     peerConnection.ontrack = (event) => {
-      const remoteStream = event.streams?.[0] || new MediaStream(event.track ? [event.track] : [])
+      let remoteStream = event.streams?.[0]
+      if (remoteStream) {
+        remoteStreamRef.current = remoteStream
+      } else if (event.track) {
+        remoteStream = remoteStreamRef.current || new MediaStream()
+        if (!remoteStream.getTracks().some((track) => track.id === event.track.id)) {
+          remoteStream.addTrack(event.track)
+        }
+      }
       attachRemoteMedia(remoteStream)
     }
 
@@ -494,7 +523,14 @@ export default function ConversationPage() {
     }
 
     peerConnection.onconnectionstatechange = () => {
-      if (['failed', 'closed'].includes(peerConnection.connectionState)) {
+      if (peerConnection.connectionState === 'connected') {
+        updateCallState((current) => current ? { ...current, active: true, phase: 'connected' } : current)
+      }
+      if (peerConnection.connectionState === 'failed') {
+        const failedCall = callStateRef.current
+        endCall(false)
+        if (failedCall) updateCallState({ ...failedCall, active: false, phase: 'unavailable', remoteStream: null, offer: null })
+      } else if (peerConnection.connectionState === 'closed') {
         endCall()
       }
     }
@@ -531,6 +567,8 @@ export default function ConversationPage() {
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = null
     }
+    remoteStreamRef.current = null
+    setSpeakerPlaybackBlocked(false)
 
     pendingIceCandidatesRef.current = []
     setCallDuration(0)
@@ -619,7 +657,7 @@ export default function ConversationPage() {
 
       const answer = await peerConnection.createAnswer()
       await peerConnection.setLocalDescription(answer)
-      updateCallState((current) => ({ ...current, active: true, incoming: false, phase: 'connected', offer: null }))
+      updateCallState((current) => ({ ...current, active: true, incoming: false, phase: 'connecting', offer: null }))
 
       getSocket()?.emit('call:answer', {
         toUserId: incomingCall.remoteUserId,
@@ -719,7 +757,7 @@ export default function ConversationPage() {
         await peerConnectionRef.current.addIceCandidate(new window.RTCIceCandidate(candidate))
       }
       pendingIceCandidatesRef.current = []
-      updateCallState((current) => ({ ...current, active: true, phase: 'connected', remoteUserId: fromUserId }))
+      updateCallState((current) => ({ ...current, active: true, phase: 'connecting', remoteUserId: fromUserId }))
     }
 
     const handleCallIce = async ({ conversationId: callConversationId, candidate }) => {
@@ -811,7 +849,7 @@ export default function ConversationPage() {
                     {callState.phase === 'incoming' ? 'Incoming audio call' : callState.phase === 'connected' ? 'Audio call connected' : callState.phase === 'ringing' ? 'Ringing...' : callState.phase === 'unavailable' ? 'Contact is unavailable' : callState.phase === 'dialing' ? 'Calling...' : 'Connecting...'}
                   </p>
                   <p className="mt-2 text-sm text-slate-300">
-                    {callState.phase === 'incoming' ? 'Tap to answer' : callState.phase === 'connected' ? formatDuration(callDuration) : callState.phase === 'unavailable' ? 'Try again later' : 'Waiting for your contact'}
+                    {callState.phase === 'incoming' ? 'Tap to answer' : callState.phase === 'connected' ? callState.remoteStream?.getAudioTracks().some((track) => track.readyState === 'live') ? `Audio connected · ${formatDuration(callDuration)}` : `Waiting for contact audio · ${formatDuration(callDuration)}` : callState.phase === 'unavailable' ? 'Try again later' : 'Waiting for your contact'}
                   </p>
                 </div>
               )}
@@ -825,6 +863,9 @@ export default function ConversationPage() {
                 </>
               ) : callState.phase === 'connected' ? (
                 <>
+                  <button onClick={enableRemoteAudio} aria-label={speakerPlaybackBlocked ? 'Enable call sound' : 'Retry call sound'} title={speakerPlaybackBlocked ? 'Enable call sound' : 'Retry call sound'} className={`flex h-12 w-12 items-center justify-center rounded-full transition ${speakerPlaybackBlocked ? 'bg-amber-300 text-slate-900' : 'bg-white/15 text-white hover:bg-white/25'}`}>
+                    {speakerPlaybackBlocked ? <VolumeX size={19} /> : <Volume2 size={19} />}
+                  </button>
                   <button onClick={toggleMicrophone} aria-label={isMicMuted ? 'Unmute microphone' : 'Mute microphone'} title={isMicMuted ? 'Unmute microphone' : 'Mute microphone'} className={`flex h-12 w-12 items-center justify-center rounded-full transition ${isMicMuted ? 'bg-white text-slate-900' : 'bg-white/15 text-white hover:bg-white/25'}`}>
                     {isMicMuted ? <MicOff size={19} /> : <Mic size={19} />}
                   </button>
